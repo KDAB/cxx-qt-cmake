@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2024 Klarälvdalens Datakonsult AB, a KDAB Group company <info@kdab.com>
+# SPDX-FileContributor: Leon Matthes <leon.matthes@kdab.com>
+#
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
+name: License Check
+
+on:
+  push:
+  pull_request:
+jobs:
+  license_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: REUSE Compliance Check
+        uses: fsfe/reuse-action@v4

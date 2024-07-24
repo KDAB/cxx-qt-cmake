@@ -3,14 +3,13 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
-CMakeLists.txt.user
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
-_deps
+@PACKAGE_INIT@
+
+if (CxxQt_FOUND)
+  return()
+endif()
+
+list(APPEND CMAKE_MODULE_PATH "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/cmake")
+
+include(CxxQt)
+
