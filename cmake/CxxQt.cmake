@@ -17,7 +17,7 @@ if(NOT Corrosion_FOUND)
 endif()
 
 function(cxx_qt_import_crate)
-  cmake_parse_arguments(IMPORT_CRATE "" "CXX_QT_EXPORT_DIR;QMAKE" "" ${ARGN})
+  cmake_parse_arguments(IMPORT_CRATE "" "CXX_QT_EXPORT_DIR;QMAKE" "QT_MODULES" ${ARGN})
 
   corrosion_import_crate(IMPORTED_CRATES __cxx_qt_imported_crates ${IMPORT_CRATE_UNPARSED_ARGUMENTS})
 
@@ -37,12 +37,27 @@ function(cxx_qt_import_crate)
     endif()
   endif()
 
+  if (NOT DEFINED IMPORT_CRATE_QT_MODULES)
+    message(FATAL_ERROR "Missing QT_MODULES argument! You must specify at least one Qt module to link to.")
+  else()
+    message(VERBOSE "CXX_QT_QT_MODULES: ${IMPORT_CRATE_QT_MODULES}")
+  endif()
+
   foreach(CRATE ${__cxx_qt_imported_crates})
+    # Join modules by a comma so that we can pass easily via an env variable
+    #
+    # TODO: can we instead read the module from _qt_config_module_name or
+    # _qt_public_module_interface_name of the target, but need to consider
+    # private modules too
+    list(JOIN IMPORT_CRATE_QT_MODULES "," IMPORT_CRATE_QT_MODULES_STR)
+
     corrosion_set_env_vars(${CRATE}
       # Tell cxx-qt-build where to export the data
       "CXX_QT_EXPORT_DIR=${IMPORT_CRATE_CXX_QT_EXPORT_DIR}"
       # Tell cxx-qt-build which crate to export
       "CXX_QT_EXPORT_CRATE_${CRATE}=1"
+      # Tell cxx-qt-build which Qt modules we are using
+      "CXX_QT_QT_MODULES=${IMPORT_CRATE_QT_MODULES_STR}"
       "QMAKE=${IMPORT_CRATE_QMAKE}"
       $<$<BOOL:${CMAKE_RUSTC_WRAPPER}>:RUSTC_WRAPPER=${CMAKE_RUSTC_WRAPPER}>)
 
@@ -75,6 +90,14 @@ function(cxx_qt_import_crate)
     # See also the "Linking Object Libraries" and "Linking Object Libraries via $<TARGET_OBJECTS>" sections:
     # https://cmake.org/cmake/help/latest/command/target_link_libraries.html
     target_link_libraries(${CRATE} INTERFACE ${CRATE}_initializers $<TARGET_OBJECTS:${CRATE}_initializers>)
+
+    # Link the static library to Qt
+    # Note that we cannot do this on the final CRATE target as this is an interface
+    # which depends on the static library. If we do target_link_libraries on the ${CRATE} target,
+    # the static library will not actually depend on the Qt modules, but be a kind of "sibling dependency", which CMake may reorder.
+    # This can cause CMake to emit the wrong link order, with Qt before the static library, which then fails to build with ld.bfd
+    # https://stackoverflow.com/questions/51333069/how-do-the-library-selection-rules-differ-between-gold-and-the-standard-bfd-li
+    target_link_libraries(${CRATE}-static INTERFACE ${IMPORT_CRATE_QT_MODULES})
   endforeach()
 
 endfunction()
