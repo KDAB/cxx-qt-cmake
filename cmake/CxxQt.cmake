@@ -61,6 +61,16 @@ function(cxx_qt_import_crate)
       "QMAKE=${IMPORT_CRATE_QMAKE}"
       $<$<BOOL:${CMAKE_RUSTC_WRAPPER}>:RUSTC_WRAPPER=${CMAKE_RUSTC_WRAPPER}>)
 
+    # When using WASM ensure that we have RUST_CXX_NO_EXCEPTIONS set
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
+        # Read any existing CXX_FLAGS and append RUST_CXX_NO_EXCEPTIONS
+        set(EMSCRIPTEN_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        list(APPEND EMSCRIPTEN_CXX_FLAGS "-DRUST_CXX_NO_EXCEPTIONS")
+
+        message(STATUS "CXX-Qt Found Emscripten, setting CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+        corrosion_set_env_vars(${CRATE} "CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+    endif()
+
     file(MAKE_DIRECTORY "${IMPORT_CRATE_CXX_QT_EXPORT_DIR}/crates/${CRATE}/include/")
     target_include_directories(${CRATE} INTERFACE "${IMPORT_CRATE_CXX_QT_EXPORT_DIR}/crates/${CRATE}/include/")
 
