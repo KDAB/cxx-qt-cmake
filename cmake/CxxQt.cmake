@@ -136,7 +136,7 @@ function(cxx_qt_import_qml_module target)
     DEPENDS ${QML_MODULE_SOURCE_CRATE}
     BYPRODUCTS "${QML_MODULE_DIR}/plugin_init.o")
 
-  add_library(${target} OBJECT IMPORTED)
+  add_library(${target} OBJECT IMPORTED GLOBAL)
   set_target_properties(${target}
     PROPERTIES
     IMPORTED_OBJECTS "${QML_MODULE_DIR}/plugin_init.o")
