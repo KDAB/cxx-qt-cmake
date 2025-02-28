@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
+option(CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING "Disable checking that the CMAKE_MSVC_RUNTIME_LIBRARY is set when importing Cargo targets in Debug builds with MSVC.")
+
 find_package(Corrosion QUIET)
 if(NOT Corrosion_FOUND)
     include(FetchContent)
@@ -41,6 +43,24 @@ function(cxx_qt_import_crate)
     message(FATAL_ERROR "Missing QT_MODULES argument! You must specify at least one Qt module to link to.")
   else()
     message(VERBOSE "CXX_QT_QT_MODULES: ${IMPORT_CRATE_QT_MODULES}")
+  endif()
+
+  if ((NOT CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING)
+      AND (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+      AND (CMAKE_BUILD_TYPE STREQUAL "Debug")
+      AND (NOT (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL")))
+    message(WARNING
+      " CXX-Qt Warning: CMAKE_MSVC_RUNTIME_LIBRARY not set in MSVC Debug build!\n \n"
+      " To fix this, set CMAKE_MSVC_RUNTIME_LIBRARY=\"MultiThreadedDLL\" when configuring.\n \n"
+      " When building with MSVC in Debug, the CMAKE_MSVC_RUNTIME_LIBRARY variable should be set to \"MultiThreadedDLL\"\n"
+      " This needs to be done before configuring any target that links to a Rust target.\n"
+      " Otherwise, you may encounter linker errors when linking to Rust targets, like:\n \n"
+      " error LNK2038: mismatch detected for '_ITERATOR_DEBUG_LEVEL': value '0' doesn't match value '2' in ...\n \n"
+      " See also:\n"
+      " https://github.com/corrosion-rs/corrosion/blob/master/doc/src/common_issues.md#linking-debug-cc-libraries-into-rust-fails-on-windows-msvc-targets\n"
+      " and: https://github.com/KDAB/cxx-qt/pull/683\n \n"
+      " To suppress this warning set CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING to ON"
+      )
   endif()
 
   foreach(CRATE ${__cxx_qt_imported_crates})
