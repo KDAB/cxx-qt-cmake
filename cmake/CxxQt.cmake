@@ -4,6 +4,8 @@
 #
 # SPDX-License-Identifier: MIT OR Apache-2.0
 
+option(CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING "Disable checking that the CMAKE_MSVC_RUNTIME_LIBRARY is set when importing Cargo targets in Debug builds with MSVC.")
+
 find_package(Corrosion QUIET)
 if(NOT Corrosion_FOUND)
     include(FetchContent)
@@ -43,6 +45,24 @@ function(cxx_qt_import_crate)
     message(VERBOSE "CXX_QT_QT_MODULES: ${IMPORT_CRATE_QT_MODULES}")
   endif()
 
+  if ((NOT CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING)
+      AND (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+      AND (CMAKE_BUILD_TYPE STREQUAL "Debug")
+      AND (NOT (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL")))
+    message(WARNING
+      " CXX-Qt Warning: CMAKE_MSVC_RUNTIME_LIBRARY not set in MSVC Debug build!\n \n"
+      " To fix this, set CMAKE_MSVC_RUNTIME_LIBRARY=\"MultiThreadedDLL\" when configuring.\n \n"
+      " When building with MSVC in Debug, the CMAKE_MSVC_RUNTIME_LIBRARY variable should be set to \"MultiThreadedDLL\"\n"
+      " This needs to be done before configuring any target that links to a Rust target.\n"
+      " Otherwise, you may encounter linker errors when linking to Rust targets, like:\n \n"
+      " error LNK2038: mismatch detected for '_ITERATOR_DEBUG_LEVEL': value '0' doesn't match value '2' in ...\n \n"
+      " See also:\n"
+      " https://github.com/corrosion-rs/corrosion/blob/master/doc/src/common_issues.md#linking-debug-cc-libraries-into-rust-fails-on-windows-msvc-targets\n"
+      " and: https://github.com/KDAB/cxx-qt/pull/683\n \n"
+      " To suppress this warning set CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING to ON"
+      )
+  endif()
+
   foreach(CRATE ${__cxx_qt_imported_crates})
     # Join modules by a comma so that we can pass easily via an env variable
     #
@@ -60,6 +80,16 @@ function(cxx_qt_import_crate)
       "CXX_QT_QT_MODULES=${IMPORT_CRATE_QT_MODULES_STR}"
       "QMAKE=${IMPORT_CRATE_QMAKE}"
       $<$<BOOL:${CMAKE_RUSTC_WRAPPER}>:RUSTC_WRAPPER=${CMAKE_RUSTC_WRAPPER}>)
+
+    # When using WASM ensure that we have RUST_CXX_NO_EXCEPTIONS set
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
+        # Read any existing CXX_FLAGS and append RUST_CXX_NO_EXCEPTIONS
+        set(EMSCRIPTEN_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        list(APPEND EMSCRIPTEN_CXX_FLAGS "-DRUST_CXX_NO_EXCEPTIONS")
+
+        message(STATUS "CXX-Qt Found Emscripten, setting CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+        corrosion_set_env_vars(${CRATE} "CXXFLAGS=${EMSCRIPTEN_CXX_FLAGS}")
+    endif()
 
     file(MAKE_DIRECTORY "${IMPORT_CRATE_CXX_QT_EXPORT_DIR}/crates/${CRATE}/include/")
     target_include_directories(${CRATE} INTERFACE "${IMPORT_CRATE_CXX_QT_EXPORT_DIR}/crates/${CRATE}/include/")
@@ -136,7 +166,7 @@ function(cxx_qt_import_qml_module target)
     DEPENDS ${QML_MODULE_SOURCE_CRATE}
     BYPRODUCTS "${QML_MODULE_DIR}/plugin_init.o")
 
-  add_library(${target} OBJECT IMPORTED)
+  add_library(${target} OBJECT IMPORTED GLOBAL)
   set_target_properties(${target}
     PROPERTIES
     IMPORTED_OBJECTS "${QML_MODULE_DIR}/plugin_init.o")
