@@ -6,7 +6,7 @@
 
 option(CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING "Disable checking that the CMAKE_MSVC_RUNTIME_LIBRARY is set when importing Cargo targets in Debug builds with MSVC.")
 
-find_package(Corrosion QUIET)
+find_package(Corrosion 0.5.1 QUIET)
 if(NOT Corrosion_FOUND)
     include(FetchContent)
     FetchContent_Declare(
