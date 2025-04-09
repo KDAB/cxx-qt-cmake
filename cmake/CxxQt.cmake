@@ -45,24 +45,6 @@ function(cxx_qt_import_crate)
     message(VERBOSE "CXX_QT_QT_MODULES: ${IMPORT_CRATE_QT_MODULES}")
   endif()
 
-  if ((NOT CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING)
-      AND (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-      AND (CMAKE_BUILD_TYPE STREQUAL "Debug")
-      AND (NOT (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL")))
-    message(WARNING
-      " CXX-Qt Warning: CMAKE_MSVC_RUNTIME_LIBRARY not set in MSVC Debug build!\n \n"
-      " To fix this, set CMAKE_MSVC_RUNTIME_LIBRARY=\"MultiThreadedDLL\" when configuring.\n \n"
-      " When building with MSVC in Debug, the CMAKE_MSVC_RUNTIME_LIBRARY variable should be set to \"MultiThreadedDLL\"\n"
-      " This needs to be done before configuring any target that links to a Rust target.\n"
-      " Otherwise, you may encounter linker errors when linking to Rust targets, like:\n \n"
-      " error LNK2038: mismatch detected for '_ITERATOR_DEBUG_LEVEL': value '0' doesn't match value '2' in ...\n \n"
-      " See also:\n"
-      " https://github.com/corrosion-rs/corrosion/blob/master/doc/src/common_issues.md#linking-debug-cc-libraries-into-rust-fails-on-windows-msvc-targets\n"
-      " and: https://github.com/KDAB/cxx-qt/pull/683\n \n"
-      " To suppress this warning set CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING to ON"
-      )
-  endif()
-
   foreach(CRATE ${__cxx_qt_imported_crates})
     # Join modules by a comma so that we can pass easily via an env variable
     #
@@ -128,7 +110,33 @@ function(cxx_qt_import_crate)
     # This can cause CMake to emit the wrong link order, with Qt before the static library, which then fails to build with ld.bfd
     # https://stackoverflow.com/questions/51333069/how-do-the-library-selection-rules-differ-between-gold-and-the-standard-bfd-li
     target_link_libraries(${CRATE}-static INTERFACE ${IMPORT_CRATE_QT_MODULES})
+
+    if ((CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+      AND (CMAKE_BUILD_TYPE STREQUAL "Debug")
+      AND (NOT (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL")))
+      # MSVC(Debug): Tell the linker not to link to the MultiThreadedDLL runtime and use the Debug version instead
+      # This is a new workaround for this issue:
+      # https://corrosion-rs.github.io/corrosion/common_issues.html#linking-debug-cc-libraries-into-rust-fails-on-windows-msvc-targets
+      # As outlined in this comment:
+      # https://github.com/rust-lang/rust/issues/39016#issuecomment-2521395154
+      target_link_options(${CRATE}-static INTERFACE  /NODEFAULTLIB:msvcrt /DEFAULTLIB:msvcrtd)
+    endif()
   endforeach()
+
+  if((NOT CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING)
+    AND (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    AND (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    AND (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL"))
+    message(WARNING
+      " CXX-Qt Warning: CMAKE_MSVC_RUNTIME_LIBRARY should no longer be set in MSVC Debug build!\n \n"
+      " In previous versions of CXX-Qt it was necessary to set CMAKE_MSVC_RUNTIME_LIBRARY=\"MultiThreadedDLL\".\n"
+      " Starting with CXX-Qt 0.7.2, this has been fixed and is no longer necessary or recommended.\n \n"
+
+      " See also:\n"
+      " https://github.com/KDAB/cxx-qt/issues/1234\n \n"
+      " To suppress this warning set CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING to ON"
+      )
+  endif()
 
 endfunction()
 
