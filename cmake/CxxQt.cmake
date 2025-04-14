@@ -47,20 +47,45 @@ function(cxx_qt_import_crate)
 
   if ((NOT CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING)
       AND (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-      AND (CMAKE_BUILD_TYPE STREQUAL "Debug")
-      AND (NOT (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL")))
-    message(WARNING
-      " CXX-Qt Warning: CMAKE_MSVC_RUNTIME_LIBRARY not set in MSVC Debug build!\n \n"
-      " To fix this, set CMAKE_MSVC_RUNTIME_LIBRARY=\"MultiThreadedDLL\" when configuring.\n \n"
-      " When building with MSVC in Debug, the CMAKE_MSVC_RUNTIME_LIBRARY variable should be set to \"MultiThreadedDLL\"\n"
-      " This needs to be done before configuring any target that links to a Rust target.\n"
-      " Otherwise, you may encounter linker errors when linking to Rust targets, like:\n \n"
-      " error LNK2038: mismatch detected for '_ITERATOR_DEBUG_LEVEL': value '0' doesn't match value '2' in ...\n \n"
-      " See also:\n"
-      " https://github.com/corrosion-rs/corrosion/blob/master/doc/src/common_issues.md#linking-debug-cc-libraries-into-rust-fails-on-windows-msvc-targets\n"
-      " and: https://github.com/KDAB/cxx-qt/pull/683\n \n"
-      " To suppress this warning set CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING to ON"
-      )
+      AND (CMAKE_BUILD_TYPE STREQUAL "Debug"))
+    if(NOT (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL"))
+      message(WARNING
+        " CXX-Qt Warning: CMAKE_MSVC_RUNTIME_LIBRARY not set in MSVC Debug build!\n \n"
+        " To fix this, set CMAKE_MSVC_RUNTIME_LIBRARY=\"MultiThreadedDLL\" when configuring.\n \n"
+        " When building with MSVC in Debug, the CMAKE_MSVC_RUNTIME_LIBRARY variable should be set to \"MultiThreadedDLL\"\n"
+        " This needs to be done before configuring any target that links to a Rust target.\n"
+        " Otherwise, you may encounter linker errors when linking to Rust targets, like:\n \n"
+        " error LNK2038: mismatch detected for '_ITERATOR_DEBUG_LEVEL': value '0' doesn't match value '2' in ...\n \n"
+        " See also:\n"
+        " https://github.com/corrosion-rs/corrosion/blob/master/doc/src/common_issues.md#linking-debug-cc-libraries-into-rust-fails-on-windows-msvc-targets\n"
+        " and: https://github.com/KDAB/cxx-qt/pull/683\n \n"
+        " To suppress this warning set CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING to ON"
+        )
+    else()
+      set(QT_COMPONENTS_DEBUG_MODE "")
+      foreach(QT_COMPONENT ${IMPORT_CRATE_QT_MODULES})
+        get_target_property(QT_COMPONENT_RUNTIME ${QT_COMPONENT} MAP_IMPORTED_CONFIG_DEBUG)
+        if(NOT (QT_COMPONENT_RUNTIME STREQUAL "RELEASE"))
+          list(APPEND QT_COMPONENTS_DEBUG_MODE ${QT_COMPONENT})
+        endif()
+      endforeach()
+
+      if(QT_COMPONENTS_DEBUG_MODE)
+        message(WARNING
+          " CXX-Qt Warning: Found Qt component(s) that may link to the MSVC Debug runtime!\n \n"
+          " To fix this, set the MAP_IMPORTED_CONFIG_DEBUG property of the Qt component to \"RELEASE\".\n \n"
+          " e.g.:   set_property(Qt6::Core Qt6::Qml ... PROPERTY MAP_IMPORTED_CONFIG_DEBUG \"RELEASE\")\n \n"
+          " Any app that statically links to Rust needs to use the release MSVC runtime for all components.\n"
+          " The following Qt components have been detected to link to the Debug runtime:\n"
+          " ${QT_COMPONENTS_DEBUG_MODE}\n \n"
+          " See also:\n"
+          " https://github.com/corrosion-rs/corrosion/blob/master/doc/src/common_issues.md#linking-debug-cc-libraries-into-rust-fails-on-windows-msvc-targets\n"
+          " https://github.com/KDAB/cxx-qt/pull/683\n"
+          " https://github.com/KDAB/cxx-qt/issues/1234\n \n"
+          " To suppress this warning set CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING to ON"
+          )
+      endif()
+    endif()
   endif()
 
   foreach(CRATE ${__cxx_qt_imported_crates})
