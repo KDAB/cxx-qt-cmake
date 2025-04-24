@@ -6,13 +6,13 @@
 
 option(CXX_QT_SUPPRESS_MSVC_RUNTIME_WARNING "Disable checking that the CMAKE_MSVC_RUNTIME_LIBRARY is set when importing Cargo targets in Debug builds with MSVC.")
 
-find_package(Corrosion 0.5.1 QUIET)
+find_package(Corrosion 0.5.2 QUIET)
 if(NOT Corrosion_FOUND)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
         GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-        GIT_TAG v0.5.1
+        GIT_TAG v0.5.2
     )
 
     FetchContent_MakeAvailable(Corrosion)
