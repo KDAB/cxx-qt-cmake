@@ -5,7 +5,7 @@
 
 cmake_minimum_required(VERSION 3.22)
 project(CxxQt
-    VERSION 0.7.2
+    VERSION 0.7.3
     LANGUAGES NONE
     HOMEPAGE_URL "https://github.com/kdab/cxx-qt/"
 )
