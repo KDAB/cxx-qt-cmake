@@ -177,7 +177,7 @@ function(cxx_qt_import_qml_module target)
   endif()
 
   # Note: This needs to match the URI conversion in cxx-qt-build
-  string(REPLACE "." "_" module_name ${QML_MODULE_URI})
+  string(REPLACE "." "/" module_name ${QML_MODULE_URI})
   set(QML_MODULE_DIR "${QML_MODULE_EXPORT_DIR}/qml_modules/${module_name}")
   file(MAKE_DIRECTORY ${QML_MODULE_DIR})
 
