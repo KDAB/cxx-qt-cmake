@@ -168,7 +168,7 @@ endfunction()
 
 
 function(cxx_qt_import_qml_module target)
-  cmake_parse_arguments(QML_MODULE "" "URI;SOURCE_CRATE" "" ${ARGN})
+  cmake_parse_arguments(QML_MODULE "" "URI;SOURCE_CRATE;OUTPUT_DIR" "" ${ARGN})
 
   if (NOT DEFINED QML_MODULE_URI)
     message(FATAL_ERROR "cxx_qt_import_qml_module: URI must be specified!")
@@ -179,7 +179,6 @@ function(cxx_qt_import_qml_module target)
   endif()
 
   get_target_property(QML_MODULE_EXPORT_DIR ${QML_MODULE_SOURCE_CRATE} CXX_QT_EXPORT_DIR)
-  get_target_property(QML_MODULE_CRATE_TYPE ${QML_MODULE_SOURCE_CRATE} TYPE)
 
   if (${QML_MODULE_EXPORT_DIR} STREQUAL "QML_MODULE_EXPORT_DIR-NOTFOUND")
     message(FATAL_ERROR "cxx_qt_import_qml_module: SOURCE_CRATE must be a valid target that has been imported with cxx_qt_import_crate!")
@@ -190,21 +189,65 @@ function(cxx_qt_import_qml_module target)
   set(QML_MODULE_DIR "${QML_MODULE_EXPORT_DIR}/qml_modules/${module_name}")
   file(MAKE_DIRECTORY ${QML_MODULE_DIR})
 
-  # QML plugin - init target
-  # When using the Ninja generator, we need to provide **some** way to generate the object file
-  # Unfortunately I'm not able to tell corrosion that this obj file is indeed a byproduct, so
-  # create a fake target for it.
-  # This target doesn't need to do anything, because the file should already exist after building the crate.
-  add_custom_target(${target}_mock_obj_output
-    COMMAND ${CMAKE_COMMAND} -E true
-    DEPENDS ${QML_MODULE_SOURCE_CRATE}
-    BYPRODUCTS "${QML_MODULE_DIR}/plugin_init.o")
+  # The QML module is built in a static library
+  # In this case, link in the object file with the initializers that is exported by our build script.
+  if (TARGET "${QML_MODULE_SOURCE_CRATE}-static")
+    if (DEFINED QML_MODULE_OUTPUT_DIR AND NOT TARGET "${QML_MODULE_SOURCE_CRATE}-shared")
+      message(WARNING "cxx_qt_import_qml_module: OUTPUT_DIR defined for QML module ${QML_MODULE_URI}, but the source crate (${QML_MODULE_SOURCE_CRATE}) is a staticlib.\nThis option only has an effect on cdylib crates!")
+    endif()
 
-  add_library(${target} OBJECT IMPORTED GLOBAL)
-  set_target_properties(${target}
-    PROPERTIES
-    IMPORTED_OBJECTS "${QML_MODULE_DIR}/plugin_init.o")
-  target_link_libraries(${target} INTERFACE ${QML_MODULE_SOURCE_CRATE})
+    # QML plugin - init target
+    # When using the Ninja generator, we need to provide **some** way to generate the object file
+    # Unfortunately I'm not able to tell corrosion that this obj file is indeed a byproduct, so
+    # create a fake target for it.
+    # This target doesn't need to do anything, because the file should already exist after building the crate.
+    add_custom_target(${target}_mock_obj_output
+      COMMAND ${CMAKE_COMMAND} -E true
+      DEPENDS ${QML_MODULE_SOURCE_CRATE}
+      BYPRODUCTS "${QML_MODULE_DIR}/plugin_init.o")
+
+    add_library(${target} OBJECT IMPORTED GLOBAL)
+    set_target_properties(${target}
+      PROPERTIES
+      IMPORTED_OBJECTS "${QML_MODULE_DIR}/plugin_init.o")
+    target_link_libraries(${target} INTERFACE ${QML_MODULE_SOURCE_CRATE})
+  endif()
+
+  # The QML module is built as a dynamic library
+  # In this case we need to ensure that the qmldir file from the target directory is propogated to the current output dir
+  if (TARGET "${QML_MODULE_SOURCE_CRATE}-shared")
+    if (NOT DEFINED QML_MODULE_OUTPUT_DIR)
+      set(QML_MODULE_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+    endif()
+    message(VERBOSE "OUTPUT_DIR for QML module ${QML_MODULE_URI}: ${QML_MODULE_OUTPUT_DIR}")
+
+    # Copy the qmldir file, as well as the shared library (with the right name) to the correct folder structure in the OUTPUT_DIR
+    # First, determine the source and destination of everything.
+    set(QML_DIR_SOURCE "${QML_MODULE_DIR}/qmldir")
+    set(QML_DIR_TARGET "${QML_MODULE_OUTPUT_DIR}/${module_name}/qmldir")
+
+    string(REPLACE "." "_" plugin_name ${QML_MODULE_URI})
+    if(WIN32)
+      set(QML_PLUGIN_NAME "${plugin_name}.dll")
+    elseif(APPLE)
+      set(QML_PLUGIN_NAME "lib${plugin_name}.dylib")
+    elseif(UNIX)
+      set(QML_PLUGIN_NAME "lib${plugin_name}.so")
+    else()
+      message(FATAL_ERROR "Unknown platform, only Windows, macOS/iOS and Unix platforms are currently supported")
+    endif()
+    set(QML_PLUGIN_TARGET "${QML_MODULE_OUTPUT_DIR}/${module_name}/${QML_PLUGIN_NAME}")
+
+    # Finally, copy everything
+    add_custom_command(OUTPUT "${QML_DIR_TARGET}" "${QML_PLUGIN_TARGET}"
+      cmake -E make_directory "${QML_MODULE_OUTPUT_DIR}/${module_name}"
+      COMMAND cmake -E copy_if_different "${QML_DIR_SOURCE}" "${QML_DIR_TARGET}"
+      COMMAND cmake -E copy_if_different $<TARGET_FILE:${QML_MODULE_SOURCE_CRATE}-shared> "${QML_PLUGIN_TARGET}")
+
+    add_custom_target(${target} ALL
+      echo "Imported dynamic QML module ${QML_MODULE_URI} to ${QML_MODULE_OUTPUT_DIR}"
+      DEPENDS "${QML_DIR_TARGET}" "${QML_PLUGIN_TARGET}")
+  endif()
 
   message(VERBOSE "CXX-Qt Expects QML plugin: ${QML_MODULE_URI} in directory: ${QML_MODULE_DIR}")
 endfunction()
