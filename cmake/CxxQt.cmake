@@ -95,6 +95,8 @@ function(cxx_qt_import_crate)
     # _qt_public_module_interface_name of the target, but need to consider
     # private modules too
     list(JOIN IMPORT_CRATE_QT_MODULES "," IMPORT_CRATE_QT_MODULES_STR)
+    # Join paths by : so that we can pass easily via an env variable
+    list(JOIN CMAKE_AUTORCC_OPTIONS ":" CXX_QT_AUTORCC_OPTIONS)
 
     corrosion_set_env_vars(${CRATE}
       # Tell cxx-qt-build where to export the data
@@ -103,6 +105,8 @@ function(cxx_qt_import_crate)
       "CXX_QT_EXPORT_CRATE_${CRATE}=1"
       # Tell cxx-qt-build which Qt modules we are using
       "CXX_QT_QT_MODULES=${IMPORT_CRATE_QT_MODULES_STR}"
+      # Tell cxx-qt-build which autorcc options are enabled
+      "CXX_QT_AUTORCC_OPTIONS=${CXX_QT_AUTORCC_OPTIONS}"
       "QMAKE=${IMPORT_CRATE_QMAKE}"
       $<$<BOOL:${CMAKE_RUSTC_WRAPPER}>:RUSTC_WRAPPER=${CMAKE_RUSTC_WRAPPER}>)
 
