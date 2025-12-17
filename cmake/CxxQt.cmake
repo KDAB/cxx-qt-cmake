@@ -221,11 +221,7 @@ function(cxx_qt_import_qml_module target)
     endif()
     message(VERBOSE "OUTPUT_DIR for QML module ${QML_MODULE_URI}: ${QML_MODULE_OUTPUT_DIR}")
 
-    # Copy the qmldir file, as well as the shared library (with the right name) to the correct folder structure in the OUTPUT_DIR
-    # First, determine the source and destination of everything.
-    set(QML_DIR_SOURCE "${QML_MODULE_DIR}/qmldir")
-    set(QML_DIR_TARGET "${QML_MODULE_OUTPUT_DIR}/${module_name}/qmldir")
-
+    # First, copy the shared library into the QML_MODULE_DIR, then copy the entire QML module folder into the target directory.
     string(REPLACE "." "_" plugin_name ${QML_MODULE_URI})
     if(WIN32)
       set(QML_PLUGIN_NAME "${plugin_name}.dll")
@@ -236,13 +232,15 @@ function(cxx_qt_import_qml_module target)
     else()
       message(FATAL_ERROR "Unknown platform, only Windows, macOS/iOS and Unix platforms are currently supported")
     endif()
-    set(QML_PLUGIN_TARGET "${QML_MODULE_OUTPUT_DIR}/${module_name}/${QML_PLUGIN_NAME}")
+    set(QML_PLUGIN_TARGET "${QML_MODULE_DIR}/${QML_PLUGIN_NAME}")
 
-    # Finally, copy everything
+    set(QML_DIR_TARGET "${QML_MODULE_OUTPUT_DIR}/${module_name}/qmldir")
+
     add_custom_command(OUTPUT "${QML_DIR_TARGET}" "${QML_PLUGIN_TARGET}"
+      # Make the output directory
       cmake -E make_directory "${QML_MODULE_OUTPUT_DIR}/${module_name}"
-      COMMAND cmake -E copy_if_different "${QML_DIR_SOURCE}" "${QML_DIR_TARGET}"
-      COMMAND cmake -E copy_if_different $<TARGET_FILE:${QML_MODULE_SOURCE_CRATE}-shared> "${QML_PLUGIN_TARGET}")
+      COMMAND cmake -E copy_if_different $<TARGET_FILE:${QML_MODULE_SOURCE_CRATE}-shared> "${QML_PLUGIN_TARGET}"
+      COMMAND cmake -E copy_directory_if_different ${QML_MODULE_DIR} "${QML_MODULE_OUTPUT_DIR}/${module_name}")
 
     add_custom_target(${target} ALL
       echo "Imported dynamic QML module ${QML_MODULE_URI} to ${QML_MODULE_OUTPUT_DIR}"
