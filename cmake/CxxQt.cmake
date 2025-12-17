@@ -105,10 +105,10 @@ function(cxx_qt_import_crate)
       "CXX_QT_EXPORT_CRATE_${CRATE}=1"
       # Tell cxx-qt-build which Qt modules we are using
       "CXX_QT_QT_MODULES=${IMPORT_CRATE_QT_MODULES_STR}"
-      # Tell cxx-qt-build which autorcc options are enabled
-      "CXX_QT_AUTORCC_OPTIONS=${CXX_QT_AUTORCC_OPTIONS}"
       "QMAKE=${IMPORT_CRATE_QMAKE}"
-      $<$<BOOL:${CMAKE_RUSTC_WRAPPER}>:RUSTC_WRAPPER=${CMAKE_RUSTC_WRAPPER}>)
+      $<$<BOOL:${CMAKE_RUSTC_WRAPPER}>:RUSTC_WRAPPER=${CMAKE_RUSTC_WRAPPER}>
+      # Tell cxx-qt-build which autorcc options are enabled, if any
+      $<$<BOOL:${CMAKE_AUTORCC_OPTIONS}>:CXX_QT_AUTORCC_OPTIONS=${CXX_QT_AUTORCC_OPTIONS}>)
 
     # When using WASM ensure that we have RUST_CXX_NO_EXCEPTIONS set
     if (${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
